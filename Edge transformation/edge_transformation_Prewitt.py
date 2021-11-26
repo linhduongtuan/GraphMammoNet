@@ -74,19 +74,6 @@ def Prewitt_v2(image):
        Prewitt_2 = cv2.addWeighted(absX, 0.5, absY, 0.5, 0)
        return Prewitt_v2
 
-#function for creating all edge-images of a directory
-def converter_Prewitt_v1(sourcedir, destdir):
-    print("\n\n---reading directory " + sourcedir + "---\n")
-    filecnt = 1
-    for filename in glob.glob(sourcedir + '/*'):
-
-        #applying Prewitt filter
-        #for appyling any other filter change filter value accordingly i.e. the 2nd args for Prewitt filter()
-        #imagemat = Prewitt_v1(filename, np.array([[-1,0,1], [-1,0,1], [-1,0,1]]))
-        imagemat = Prewitt_v2(filename)
-        cv2.imwrite(destdir+'/img-'+str(filecnt)+'.png', imagemat) #create the edge image and store it to consecutive filenames
-        filecnt += 1
-    print("\n\n--saved in " + destdir + "--\n")
 
 
 #function for creating all edge-images of a directory
