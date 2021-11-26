@@ -27,13 +27,13 @@ activity_map[8] = 'BIRAD_5'
 #z-score normalization
 def normalize(arr):
     arr = np.array(arr)
-    m = np.mean(arr)
-    s = np.std(arr)
+    m   = np.mean(arr)
+    s   = np.std(arr)
     return (arr - m)/s
 
 #generate graph for a given edge-image file
 def generate_graphs(filename, node_label, activity_map):
-    print(" ... Reading image: "+filename+" ...")
+    print(" ... Reading image: " + filename+" ...")
     global node_id, edges, attrs, graph_id, node_labels, graph_indicator
     cnt           = 0
     img           = cv2.imread(filename)
@@ -54,7 +54,7 @@ def generate_graphs(filename, node_label, activity_map):
                 graph_indicator.append(graph_id)
                 node_labels.append([node_label, activity_map[node_label]])
                 node_id += 1
-                cnt += 1
+                cnt     += 1
             else:
                 img1[i][j] = 0
   
@@ -81,7 +81,7 @@ def generate_graphs(filename, node_label, activity_map):
 
 #generate graphs for all edge-image under given dir along with proper label
 def generate_graph_with_labels(dirname, label, activity_map):
-    print("\n... Reading Directory: " + dirname+" ...\n")
+    print("\n... Reading Directory: " + dirname + " ...\n")
     global graph_labels
     filenames = glob.glob(dirname + '/*.png')
     for filename in filenames:
@@ -108,7 +108,7 @@ def process_graphs(BIRAD_0_dir,
     generate_graph_with_labels(BIRAD_4C_dir, 7, activity_map)
     generate_graph_with_labels(BIRAD_5_dir,  8, activity_map)
     print("Processing done")
-    print("Total nodes formed: " + str(len(node_labels)) + "Total graphs formed: "+str(len(graph_labels)))
+    print("Total nodes formed: " + str(len(node_labels)) + "Total graphs formed: " + str(len(graph_labels)))
 
 #working directories
 BIRAD_0_dir  = '/home/linh/Downloads/data/Prewitt_v2_preprocessed_data/BIRAD_0'
@@ -141,7 +141,7 @@ print(len(edges))
 print(len(attrs))
 
 #create adjacency dataframe
-df_A = pd.DataFrame(columns = ["node-1","node-2"], data = np.array(edges))
+df_A = pd.DataFrame(columns = ["node-1", "node-2"], data = np.array(edges))
 print("Shape of edge dataframe: " + str(df_A.shape))
 print("\n--summary of dataframe--\n", df_A.head(50))
 
@@ -167,15 +167,15 @@ print("\n--summary of dataframe--\n", df_graph_indicator.head(50))
 
 #omit activity name later for graph-label and node-label
 #since GIN model will only accept the label
-df_node_label = df_node_label.drop(["activity-name"],axis=1)
+df_node_label = df_node_label.drop(["activity-name"], axis=1)
 print(df_node_label.head(50))
 
-df_graph_label = df_graph_label.drop(["activity-name"],axis=1)
+df_graph_label = df_graph_label.drop(["activity-name"], axis=1)
 print(df_graph_label.head(50))
 
 
 
-def save_dataframe_to_txt(df,filepath):
+def save_dataframe_to_txt(df, filepath):
     df.to_csv(filepath, header=None, index=None, sep=',', mode='w')
 
 
@@ -192,7 +192,7 @@ def save_dataframe_to_txt(df,filepath):
 sourcepath='/home/linh/Downloads/data/Mammograms_Prewitt_v2/raw'
 os.makedirs(sourcepath, exist_ok=False)
 print("The new directory is created!")
-save_dataframe_to_txt(df_A, sourcepath + '/Mammograms_Prewitt_A.txt')
+save_dataframe_to_txt(df_A, sourcepath + '/Mammograms_Prewitt_v2_A.txt')
 save_dataframe_to_txt(df_graph_indicator, sourcepath + '/Mammograms_Prewitt_v2_graph_indicator.txt')
 save_dataframe_to_txt(df_graph_label, sourcepath + '/Mammograms_Prewitt_v2_graph_labels.txt')
 save_dataframe_to_txt(df_node_attr, sourcepath + '/Mammograms_Prewitt_v2_node_attributes.txt')

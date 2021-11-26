@@ -14,7 +14,7 @@ node_labels     = [] #containing labels for all node
 graph_labels    = []#containing labels for all graph
 
 #activity-label vs activity-name mapping (4-class)
-activity_map = {}
+activity_map    = {}
 activity_map[1] = 'BIRAD_0'
 activity_map[2] = 'BIRAD_1'
 activity_map[3] = 'BIRAD_2'
@@ -27,13 +27,13 @@ activity_map[8] = 'BIRAD_5'
 #z-score normalization
 def normalize(arr):
     arr = np.array(arr)
-    m = np.mean(arr)
-    s = np.std(arr)
+    m   = np.mean(arr)
+    s   = np.std(arr)
     return (arr - m)/s
 
 #generate graph for a given edge-image file
 def generate_graphs(filename, node_label, activity_map):
-    print(" ... Reading image: "+filename+" ...")
+    print(" ... Reading image: " + filename+" ...")
     global node_id, edges, attrs, graph_id, node_labels, graph_indicator
     cnt           = 0
     img           = cv2.imread(filename)
@@ -48,13 +48,13 @@ def generate_graphs(filename, node_label, activity_map):
         for j in range(dim2):
             #considering pixel as node if pixel-value>=128
             b, _, _ = img[i][j]
-            if(b>=128):
+            if(b >= 128):
                 nodes[i][j] = node_id
                 attrs1.append(b)
                 graph_indicator.append(graph_id)
                 node_labels.append([node_label, activity_map[node_label]])
                 node_id += 1
-                cnt += 1
+                cnt     += 1
             else:
                 img1[i][j] = 0
   
@@ -62,7 +62,7 @@ def generate_graphs(filename, node_label, activity_map):
         for j in range(dim2):
             #forming edge between all adjacent pixels which are node
             if(nodes[i][j] != -1):
-                li = max(0, i-1)
+                li = max(0, i - 1)
                 ri = min(i + 2, dim1)
                 lj = max(0, j - 1)
                 rj = min(j + 2, dim2)
@@ -81,7 +81,7 @@ def generate_graphs(filename, node_label, activity_map):
 
 #generate graphs for all edge-image under given dir along with proper label
 def generate_graph_with_labels(dirname, label, activity_map):
-    print("\n... Reading Directory: " + dirname+" ...\n")
+    print("\n... Reading Directory: " + dirname + " ...\n")
     global graph_labels
     filenames = glob.glob(dirname + '/*.png')
     for filename in filenames:
@@ -108,7 +108,7 @@ def process_graphs(BIRAD_0_dir,
     generate_graph_with_labels(BIRAD_4C_dir, 7, activity_map)
     generate_graph_with_labels(BIRAD_5_dir,  8, activity_map)
     print("Processing done")
-    print("Total nodes formed: " + str(len(node_labels)) + "Total graphs formed: "+str(len(graph_labels)))
+    print("Total nodes formed: " + str(len(node_labels)) + "Total graphs formed: " + str(len(graph_labels)))
 
 #working directories
 BIRAD_0_dir  = '/home/linh/Downloads/data/Canny_preprocessed_data/BIRAD_0'
@@ -119,6 +119,7 @@ BIRAD_4A_dir = '/home/linh/Downloads/data/Canny_preprocessed_data/BIRAD_4A'
 BIRAD_4B_dir = '/home/linh/Downloads/data/Canny_preprocessed_data/BIRAD_4B'
 BIRAD_4C_dir = '/home/linh/Downloads/data/Canny_preprocessed_data/BIRAD_4C'
 BIRAD_5_dir  = '/home/linh/Downloads/data/Canny_preprocessed_data/BIRAD_5'
+
 
 
 #generate_graph_with_labels(BIRAD_0_dir, 1, activity_map)
@@ -140,7 +141,7 @@ print(len(edges))
 print(len(attrs))
 
 #create adjacency dataframe
-df_A = pd.DataFrame(columns = ["node-1","node-2"], data = np.array(edges))
+df_A = pd.DataFrame(columns = ["node-1", "node-2"], data = np.array(edges))
 print("Shape of edge dataframe: " + str(df_A.shape))
 print("\n--summary of dataframe--\n", df_A.head(50))
 
@@ -174,7 +175,7 @@ print(df_graph_label.head(50))
 
 
 
-def save_dataframe_to_txt(df,filepath):
+def save_dataframe_to_txt(df, filepath):
     df.to_csv(filepath, header=None, index=None, sep=',', mode='w')
 
 
