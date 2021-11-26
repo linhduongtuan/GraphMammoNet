@@ -1,44 +1,50 @@
 import time
 import random
-import sys
 import numpy as np
-import torch
 import argparse
-import torch.nn.functional as F
-import matplotlib.pyplot as plt
-from statistics import mean, pstdev
-import torch.nn.functional as F
+from datetime import datetime
+import torch
+import torch.optim as optim
 
-from model import *
+from torch_geometric.loader import DataLoader
+from models import *
 from dataloader import *
-
-import seaborn as sns
-
-from sklearn.metrics import f1_score, precision_score, recall_score,roc_curve,auc,classification_report,confusion_matrix
-
 from tensorflow.keras.utils import to_categorical
+import matplotlib.pyplot as plt
+from tensorboardX import SummaryWriter
+from sklearn.metrics import f1_score, precision_score, recall_score,roc_curve,auc,classification_report,confusion_matrix
 
 # Training settings
 parser = argparse.ArgumentParser()
 parser.add_argument('cuda', action='store_true', default=False,
                     help='Use CUDA for training.')
 parser.add_argument('--seed', type=int, default=42, help='Random seed.')
-parser.add_argument('--epochs', type=int, default=200,
+parser.add_argument('--root', type=str, default='/home/linh/Downloads/data/',
+                    help='path to the dataset')
+parser.add_argument('--dataset_name', type=str, default='Mammograms_Prewitt_v1',
+                    help='Dataset name')
+parser.add_argument('--task', type=str, default='graph',
+                    help='choose to classify node or graph')
+parser.add_argument('--batch_size', type=int, default=1024,
+                    help='batch size for loading mini batches of data')
+parser.add_argument('--k_fold', type=int, default=5,
+                    help='set a number of cross validation')
+parser.add_argument('--epochs', type=int, default=100,
                     help='Number of epochs to train.')
 parser.add_argument('--lr', type=float, default=0.001,
                     help='Initial learning rate.')
 parser.add_argument('--weight_decay', type=float, default=5e-4,
                     help='Weight decay for optimizer.')
-parser.add_argument('--hidden', type=int, default=16,
+parser.add_argument('--num_layers', type=int, default=3,
+                    help='set a number of GNN layers')
+parser.add_argument('--hidden_dim', type=int, default=32,
                     help='Number of hidden units.')
 parser.add_argument('--dropout', type=float, default=0.5,
                     help='Dropout rate (1 - keep probability).')
 parser.add_argument('--train_split', type=float, default=0.8,
                     help='Ratio of train split from entire dataset.Rest goes to test set')
-parser.add_argument('--batch_size', type=int, default=16,
-                    help='batch size for loading mini batches of data')
-parser.add_argument('--dataset_name', type=str, default='Mammograms',
-                    help='Dataset name')
+
+
 
 args = parser.parse_args()
 if args.cuda:
@@ -57,45 +63,61 @@ random.seed(args.seed)
 np.random.seed(args.seed)
 torch.manual_seed(args.seed)
 
-dataset = GraphDataset(root='Mammograms/data/', name=args.dataset_name, use_node_attr=True)
+dataset = GraphDataset(root=args.root, name=args.dataset_name, use_node_attr=True)
 data_size = len(dataset)
 
 #checking some of the data attributes comment out these lines if not needed to check
+#checking some of the data attributes comment out these lines if not needed to check
+print()
+print(f'Dataset: {dataset}:')
+print('====================')
+print(f'Number of graphs: {len(dataset)}')
+print(f'Number of features: {dataset.num_features}')
+print(f'Number of classes: {dataset.num_classes}')
+
+data = dataset[0]  # Get the first graph object.
+
+print()
+print(data)
+print('=============================================================')
+
+# Gather some statistics about the first graph.
+print(f'Number of nodes: {data.num_nodes}')
+print(f'Number of edges: {data.num_edges}')
+print(f'Average node degree: {data.num_edges / data.num_nodes:.2f}')
+print(f'Has isolated nodes: {data.has_isolated_nodes()}')
+print(f'Has self-loops: {data.has_self_loops()}')
+print(f'Is undirected: {data.is_undirected()}')
 print("*"*10)
 print(data_size)
 print(dataset.num_features)
-print(args.hidden)
+print(args.hidden_dim)
 print(args.dropout)
-print(dataset.num_classes)
 print("*"*10)
 
 n_classes=dataset.num_classes
-class_list=[]
-for i in range(0,n_classes):
+class_list = []
+for i in range(0, n_classes):
     class_list.append(i)
     
 
 #printing confusion matrix
 def show_confusion_matrix(validations, predictions):
   
-    LABELS=["BIRAD_0","BIRAD_1","BIRAD_2", "BIRAD_3", "BIRAD_4A", "BIRAD_4B", "BIRAD_4C", "BIRAD_5"]
+    LABELS=["BIRAD_0","BIRAD_1","BIRAD_2", "BIRAD_3","BIRAD_4A","BIRAD_4B", "BIRAD_4C","BIRAD_5"]
     matrix = confusion_matrix(validations, predictions)
     print(matrix)
-    
 
 #applying k-fold cross validation
 def crossvalid(dataset=None,k_fold=5):
-    
     global precision,recall,f1
-    
-    
     total_size = len(dataset)
-    fraction = 1/k_fold
-    seg = int(total_size * fraction) 
-    index=0
-    test_accs=[]
-    train_time=0
-    test_time=0
+    fraction   = 1/k_fold
+    seg        = int(total_size * fraction) 
+    index      = 0
+    test_accs  = []
+    train_time = 0
+    test_time  = 0
     for i in range(k_fold):
         if(i==k_fold-1):
             print("Running for {} fold".format(index+1))
@@ -125,69 +147,64 @@ def crossvalid(dataset=None,k_fold=5):
                                               
             
             model = GNNStack(max(dataset.num_node_features, 1), 32, dataset.num_classes, task=task)
-            opt = optim.Adam(model.parameters(), lr=0.001)
+            opt   = optim.Adam(model.parameters(), lr=0.001)
             
-            loss_values=[]
-            accuracy_values=[]
-            
-            train_start=time.time()  
+            loss_values     = []
+            accuracy_values = []
+            train_start     = time.time()  
             for epoch in range(1):
-              total_loss = 0
-              model.train()
-              for batch in train_loader:
-                
-                opt.zero_grad()
-                embedding, pred, soft= model(batch)
-                label = batch.y
-                if task == 'node':
-                    pred = pred[batch.train_mask]
-                    label = label[batch.train_mask]
-                loss = model.loss(pred, label)
-                loss.backward()
-                opt.step()
-                total_loss += loss.item() * batch.num_graphs
-              total_loss /= len(train_loader.dataset)
-              writer.add_scalar("loss", total_loss, epoch)
+                total_loss = 0
+                model.train()
+                for batch in train_loader:
+                    opt.zero_grad()
+                    embedding, pred, soft= model(batch)
+                    label = batch.y
+                    if task == 'node':
+                        pred  = pred[batch.train_mask]
+                        label = label[batch.train_mask]
+                    loss = model.loss(pred, label)
+                    loss.backward()
+                    opt.step()
+                    total_loss += loss.item() * batch.num_graphs
+                total_loss /= len(train_loader.dataset)
+                writer.add_scalar("loss", total_loss, epoch)
     
-              if epoch % 1 == 0:
-                train_acc = test(train_loader, model)
-                print("Epoch {}. Train Loss: {:.4f}. Train accuracy: {:.4f}".format(
-                    epoch, total_loss, train_acc))
-                    
-                loss_values.append(total_loss)
-                accuracy_values.append(train_acc)
-                
-                writer.add_scalar("train accuracy", train_acc, epoch)
+                if epoch % 1 == 0:
+                    train_acc = test(train_loader, model)
+                    print("Epoch {}. Train Loss: {:.4f}. Train accuracy: {:.4f}".format(epoch, total_loss, train_acc))
+                    loss_values.append(total_loss)
+                    accuracy_values.append(train_acc)
+                    writer.add_scalar("train accuracy", train_acc, epoch)
             
-            train_end=time.time()
-            print("Time taken for training: ",train_end-train_start)
-            train_time+=(train_end-train_start)
+                train_end = time.time()
+                print("Time taken for training: ", train_end - train_start)
+                train_time += (train_end - train_start)
             
-            test_start=time.time()
+                test_start = time.time()
             test_acc = test(val_loader, model, True)
-            test_end=time.time()
+            test_end =time.time()
             print("Test accuracy: {:.4f}".format(test_acc))
-            print("Time taken for testing: ",test_end-test_start)
-            test_time+=(test_end-test_start)
+            print("Time taken for testing: ",test_end - test_start)
+            test_time+=(test_end - test_start)
             
             fig = plt.figure(figsize=(5,5))
-            ax = fig.add_subplot(111)
+            ax  = fig.add_subplot(111)
             ax.set_title('Training loss and accuracy Vs Epoch')
             plt.plot(loss_values, color='red',label='Loss')
             plt.plot(accuracy_values, color='blue',label='Accuracy')
             ax.set_xlabel('Epoch')
             ax.set_ylabel('Loss and Accuracy')
             ax.legend(loc='best')
-            plt.savefig(f"{k_fold}-fold_"+args.dataset_name+"_"+str(i+1)+".png")
+            plt.savefig(f"{k_fold}-fold_"+ args.dataset_name + "_" + str(i+1) + ".png")
             
             test_accs.append(test_acc)
                 
-    precision/=k_fold
-    recall/=k_fold
-    f1/=k_fold
-    avg_test=sum(test_accs)/len(test_accs)
-    train_time/=k_fold
-    test_time/=k_fold
+    precision  /= k_fold
+    recall     /= k_fold
+    f1         /= k_fold
+    avg_test    = sum(test_accs)/len(test_accs)
+    train_time /= k_fold
+    test_time  /= k_fold
     print("------------")
     print("{} fold test accuracy {:.4f}, precision {:.4f}, recall {:.4f}, F1-score {:.4f}".format(k_fold,avg_test,precision,recall,f1))
     print("Average training time {:.3f}, average testing time {:.3f}".format(train_time,test_time))    
@@ -199,48 +216,47 @@ def train(dataset, task, writer):
 #function for calculating acc for different train-ratio
 def eval_train_ratio(dataset, task, writer):
     
-    train_ratios=[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
-    test_accuracies=[]
-    train_accuracies=[]
+    train_ratios     = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
+    test_accuracies  = []
+    train_accuracies = []
     for tr in train_ratios:
         if task == 'graph':
             data_size = len(dataset)
             train_loader = DataLoader(dataset[:int(data_size * tr)], batch_size=1, shuffle=True)
-            test_loader = DataLoader(dataset[int(data_size * tr):], batch_size=1, shuffle=True)
+            test_loader  = DataLoader(dataset[int(data_size * tr):], batch_size=1, shuffle=True)
         else:
-            test_loader = train_loader = DataLoader(dataset, batch_size=64, shuffle=True)
+            test_loader  = train_loader = DataLoader(dataset, batch_size=64, shuffle=True)
     
         print("Train ratio: {:.1f}. No of training graphs: {}. No of testing graphs: {}".format(tr,len(train_loader),len(test_loader)))
         
         model = GNNStack(max(dataset.num_node_features, 1), 32, dataset.num_classes, task=task)
-        opt = optim.Adam(model.parameters(), lr=0.001)
+        opt = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
         for epoch in range(10):
           total_loss = 0
           model.train()
           for batch in train_loader:
-            
             opt.zero_grad()
             embedding, pred ,_= model(batch)
             label = batch.y
             if task == 'node':
-                pred = pred[batch.train_mask]
+                pred  = pred[batch.train_mask]
                 label = label[batch.train_mask]
             loss = model.loss(pred, label)
             loss.backward()
             opt.step()
             total_loss += loss.item() * batch.num_graphs
-          total_loss /= len(train_loader.dataset)
+          total_loss   /= len(train_loader.dataset)
           
         
         train_acc = test(train_loader, model)
-        test_acc = test(test_loader, model, True)
+        test_acc  = test(test_loader, model, True)
         print("Test accuracy: {:.4f}".format(test_acc))
         test_accuracies.append(test_acc)
         train_accuracies.append(train_acc)
         
     fig = plt.figure(figsize=(7,7))
-    ax = fig.add_subplot(111)
+    ax  = fig.add_subplot(111)
     ax.set_title('Training and testing accuracy Vs Train Ratio')
     plt.plot(train_ratios, train_accuracies, color='red', marker= 'o',label='Train Acc')
     plt.plot(train_ratios, test_accuracies, color='blue',marker= 'o', label='Test Acc')
@@ -248,37 +264,33 @@ def eval_train_ratio(dataset, task, writer):
     ax.set_ylabel('Training and testing accuracy')
     ax.legend(loc='best')
     #plt.show()
-    plt.savefig(f"iterative_training_"+args.dataset_name+".png")
+    plt.savefig(f"iterative_training_" + args.dataset_name + ".png")
     
 def test(loader, model, is_test=False,is_validation=False):
     global precision,recall,f1
     global class_list,n_classes
     global cnt
     model.eval()
-    
     correct = 0
-    glabel=[]
-    glabel1=[]
-    gpred=[]
-    gscore=[]
+    glabel  = []
+    glabel1 = []
+    gpred   = []
+    gscore  = []
     for data in loader:
         with torch.no_grad():
             emb, pred,soft = model(data)
             var=soft.numpy()[0]
             pred = pred.argmax(dim=1)
-            label = data.y
-            
-            
+            label = data.y        
             if(is_test): 
                 glabel.append(label.numpy()[0])
                 glabel1.append(label.numpy())   
                 gpred.append(pred.numpy()[0])
                 gscore.append(var)
-            
-
+ 
         if model.task == 'node':
-            mask = data.val_mask if is_validation else data.test_mask
-            pred = pred[mask]
+            mask  = data.val_mask if is_validation else data.test_mask
+            pred  = pred[mask]
             label = data.y[mask]
             
         correct += pred.eq(label).sum().item()
@@ -291,65 +303,57 @@ def test(loader, model, is_test=False,is_validation=False):
             total += torch.sum(data.test_mask).item()
     
     if(is_test):
-        glabel=np.array(glabel)
-        glabel1=np.array(glabel1)
-        gpred=np.array(gpred)
-        gscore=np.array(gscore)
-        enlabel=to_categorical(glabel1,n_classes)
-        
-        
-        
-        p=precision_score(glabel, gpred, average="micro")
-        r=recall_score(glabel, gpred, average="micro")
-        f=f1_score(glabel, gpred, average="micro")
+        glabel  = np.array(glabel)
+        glabel1 = np.array(glabel1)
+        gpred   = np.array(gpred)
+        gscore  = np.array(gscore)
+        enlabel = to_categorical(glabel1,n_classes)
+     
+        p      = precision_score(glabel, gpred, average="micro")
+        r      = recall_score(glabel, gpred, average="micro")
+        f      = f1_score(glabel, gpred, average="micro")
         
         print('F1: {}'.format(f))
         print('Precision: {}'.format(p))
         print('Recall: {}'.format(r))
-        precision+=p
-        recall+=r
-        f1+=f
+        precision += p
+        recall    += r
+        f1        += f
         
         print("\n...confusion matrix and classification report....\n")
         show_confusion_matrix(glabel,gpred)
         print(classification_report(glabel,gpred))
 
-        
         #generate roc curve
-        tpr=dict()
-        fpr=dict()
-        roc_auc=dict()
+        tpr     = dict()
+        fpr     = dict()
+        roc_auc = dict()
         for i in range(n_classes):
             fpr[i], tpr[i], _= roc_curve(enlabel[:, i], gscore[:, i])
             roc_auc[i] = auc(fpr[i], tpr[i])
         fig = plt.figure(figsize=(5,5))
         ax = fig.add_subplot(111)
         ax.set_title('ROC curve for all classes')
-        colors=['red','blue','green','yellow','purple','orange']
+        colors=['red','blue','green','yellow','purple','orange', 'black', 'pink']
         for i in range(n_classes):
             plt.plot(fpr[i], tpr[i], color=colors[i],lw=2,label='ROC curve of class {0} (area = {1:0.2f})'
              ''.format(i, roc_auc[i]))    
         ax.set_xlabel('False postive rate')
         ax.set_ylabel('True postive rate')
         ax.legend(loc='best')
-        plt.savefig(f"roc_"+args.dataset_name+"_"+str(cnt)+".png")
+        plt.savefig(f"roc_" + args.dataset_name + "_" + str(cnt) + ".png")
         cnt+=1
         
     return correct / total
-dataset = dataset.shuffle()
-task = 'graph'
-writer = SummaryWriter("./log/" + datetime.now().strftime("%Y%m%d-%H%M%S"))
-
-#globals 
-precision=0
-recall=0
-f1=0
-
-cnt=1
-
-train(dataset, task, writer)
-eval_train_ratio(dataset, task, writer)
-
-
-
+if __name__ == '__main__':
+    dataset   = dataset.shuffle()
+    task      = args.task #'graph'
+    writer    = SummaryWriter("./log/" + datetime.now().strftime("%Y%m%d-%H%M%S"))
+    #globals 
+    precision = 0
+    recall    = 0
+    f1        = 0
+    cnt       = 1
+    train(dataset, task, writer)
+    eval_train_ratio(dataset, task, writer)
 
