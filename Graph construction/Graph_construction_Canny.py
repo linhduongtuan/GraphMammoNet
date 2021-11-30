@@ -1,6 +1,7 @@
 import cv2
 import os
 import glob
+import time
 import pandas as pd
 import numpy as np
 
@@ -121,7 +122,7 @@ BIRAD_4C_dir = '/home/linh/Downloads/data/Canny_preprocessed_data/BIRAD_4C'
 BIRAD_5_dir  = '/home/linh/Downloads/data/Canny_preprocessed_data/BIRAD_5'
 
 
-
+start = time.time()
 #generate_graph_with_labels(BIRAD_0_dir, 1, activity_map)
 process_graphs(BIRAD_0_dir, 
                BIRAD_1_dir, 
@@ -188,7 +189,7 @@ def save_dataframe_to_txt(df, filepath):
 #graph_labels--> labels for all graph
 #node_attributes--> attribute(s) for all node
 #node_labels--> labels for all node
-
+start = time.time()
 sourcepath='/home/linh/Downloads/data/Mammograms_Canny/raw'
 os.makedirs(sourcepath, exist_ok=False)
 print("The new directory is created!")
@@ -198,3 +199,9 @@ save_dataframe_to_txt(df_graph_label, sourcepath + '/Mammograms_Canny_graph_labe
 save_dataframe_to_txt(df_node_attr, sourcepath + '/Mammograms_Canny_node_attributes.txt')
 save_dataframe_to_txt(df_node_label, sourcepath + '/Mammograms_Canny_node_labels.txt')
 
+
+
+end = time.time()
+time_to_construct = (end - start)/60
+print("Total time (min) for constructing Graph: ", time_to_construct)
+print("=======End constructing Graph process here======")

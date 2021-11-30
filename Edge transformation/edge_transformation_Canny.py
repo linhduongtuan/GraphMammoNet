@@ -1,6 +1,7 @@
 import cv2
 import os
 import glob
+import time
 from multiprocessing.pool import Pool
 
 
@@ -15,10 +16,17 @@ def Canny_converter(sourcedir, destdir):
         filecnt += 1
     print("\n\n--saved in " + destdir + "--\n")
 
+start = time.time()
+
 sourcedir = ('/home/linh/Downloads/data/ori/BIRAD_3')
 destdir = ('/home/linh/Downloads/data/Canny_preprocessed_data/BIRAD_3')
 os.makedirs(destdir, exist_ok=True)
 print("The new directory is created!")
-with Pool(28) as p:
-    p.map(Canny_converter(sourcedir, destdir))
-#convert_edge_dir(sourcedir, destdir)
+#with Pool(28) as p:
+#    p.map(Canny_converter(sourcedir, destdir))
+Canny_converter(sourcedir, destdir)
+
+end = time.time()
+time_to_transform = (end - start)/60
+print("Total time (min) for transforming edege :", time_to_transform)
+print("=======End transforming edege process here======")

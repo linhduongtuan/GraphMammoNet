@@ -1,6 +1,4 @@
 import torch
-from torch_geometric.data import Data
-from torch_geometric.data import DataLoader
 from torch_geometric.data import InMemoryDataset
 from torch_geometric.io import read_tu_data
 import os.path as osp

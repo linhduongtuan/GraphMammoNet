@@ -1,7 +1,7 @@
 import numpy as np
 import cv2
 import os
-import matplotlib.pyplot as plt
+import time
 import glob
 from multiprocessing.pool import Pool
 
@@ -71,7 +71,7 @@ def Prewitt_v2(image):
        # Turn uint8, image fusion
        absX = cv2.convertScaleAbs(x)
        absY = cv2.convertScaleAbs(y)
-       Prewitt_2 = cv2.addWeighted(absX, 0.5, absY, 0.5, 0)
+       Prewitt_v2 = cv2.addWeighted(absX, 0.5, absY, 0.5, 0)
        return Prewitt_v2
 
 
@@ -101,58 +101,43 @@ def converter_Prewitt_v2(sourcedir, destdir):
         filecnt += 1
     print("\n\n--saved in " + destdir + "--\n")
 
-def convert_Prewitt_v1_all(BIRAD_0_dir, 
-                           BIRAD_1_dir,
-                           BIRAD_2_dir,
-                           BIRAD_3_dir,
-                           BIRAD_4A_dir,
-                           BIRAD_4B_dir,
-                           BIRAD_4C_dir,
-                           BIRAD_5_dir,
+def convert_Prewitt_v1_all(Type_A_dir, 
+                           Type_B_dir,
+                           Type_C_dir,
+                           Type_D_dir,       
                            destdir):
-    converter_Prewitt_v1(BIRAD_0_dir,  destdir + '/BIRAD_0')
-    converter_Prewitt_v1(BIRAD_1_dir,  destdir + '/BIRAD_1')
-    converter_Prewitt_v1(BIRAD_2_dir,  destdir + '/BIRAD_2')
-    converter_Prewitt_v1(BIRAD_3_dir,  destdir + '/BIRAD_3')
-    converter_Prewitt_v1(BIRAD_4A_dir, destdir + '/BIRAD_4A')
-    converter_Prewitt_v1(BIRAD_4B_dir, destdir + '/BIRAD_4B')
-    converter_Prewitt_v1(BIRAD_4C_dir, destdir + '/BIRAD_4C')
-    converter_Prewitt_v1(BIRAD_5_dir,  destdir + '/BIRAD_5')
+    converter_Prewitt_v1(Type_A_dir,  destdir + '/A')
+    converter_Prewitt_v1(Type_B_dir,  destdir + '/B')
+    converter_Prewitt_v1(Type_C_dir,  destdir + '/C')
+    converter_Prewitt_v1(Type_D_dir,  destdir + '/D')
+
     print("\n---edge detection completed--\n")
 
 
-def convert_Prewitt_v2_all(BIRAD_0_dir, 
-                           BIRAD_1_dir,
-                           BIRAD_2_dir,
-                           BIRAD_3_dir,
-                           BIRAD_4A_dir,
-                           BIRAD_4B_dir,
-                           BIRAD_4C_dir,
-                           BIRAD_5_dir,
+def convert_Prewitt_v2_all(Type_A_dir, 
+                           Type_B_dir,
+                           Type_C_dir,
+                           Type_D_dir,
                            destdir):
-    converter_Prewitt_v2(BIRAD_0_dir,  destdir + '/BIRAD_0')
-    converter_Prewitt_v2(BIRAD_1_dir,  destdir + '/BIRAD_1')
-    converter_Prewitt_v2(BIRAD_2_dir,  destdir + '/BIRAD_2')
-    converter_Prewitt_v2(BIRAD_3_dir,  destdir + '/BIRAD_3')
-    converter_Prewitt_v2(BIRAD_4A_dir, destdir + '/BIRAD_4A')
-    converter_Prewitt_v2(BIRAD_4B_dir, destdir + '/BIRAD_4B')
-    converter_Prewitt_v2(BIRAD_4C_dir, destdir + '/BIRAD_4C')
-    converter_Prewitt_v2(BIRAD_5_dir,  destdir + '/BIRAD_5')
+    converter_Prewitt_v2(Type_A_dir,  destdir + '/A')
+    converter_Prewitt_v2(Type_B_dir,  destdir + '/B')
+    converter_Prewitt_v2(Type_C_dir,  destdir + '/C')
+    converter_Prewitt_v2(Type_D_dir,  destdir + '/D')
+
     print("\n---edge detection completed--\n")
 
+start = time.time()
 
-sourcedir = '/home/linh/Downloads/data/ori/BIRAD_4C'
-destdir   = '/home/linh/Downloads/data/Prewitt_v1_preprocessed_data/BIRAD_4C'
+sourcedir = '/home/linh/Downloads/data/ori_type/A'
+destdir   = '/home/linh/Downloads/data/Type_Prewitt_v1_preprocessed_data/A'
 os.makedirs(destdir, exist_ok=False)
 print("The new directory is created!")
-with Pool(28) as p:
-    p.map(converter_Prewitt_v1(sourcedir, destdir))
-#convert_edge_dir(sourcedir, destdir)
-
-#sourcedir = '/home/linh/Downloads/data/ori/BIRAD_4C'
-#destdir   = '/home/linh/Downloads/data/Prewitt_v2_preprocessed_data/BIRAD_4C'
-#os.makedirs(destdir, exist_ok=False)
-#print("The new directory is created!")
 #with Pool(28) as p:
-#    p.map(converter_Prewitt_v2(sourcedir, destdir))
-#convert_edge_dir(sourcedir, destdir)
+#    p.map(converter_Prewitt_v1(sourcedir, destdir))
+
+converter_Prewitt_v1(sourcedir, destdir)   
+    
+end = time.time()
+time_to_transform = (end - start)/60
+print("Total time (min) for transforming edege :", time_to_transform)
+print("=======End transforming edege process here======")

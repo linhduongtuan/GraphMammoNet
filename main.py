@@ -1,85 +1,94 @@
+#import general packages
 import time
 import random
 import numpy as np
 import argparse
-from datetime import datetime
-import torch
-import torch.optim as optim
-
-from torch_geometric.loader import DataLoader
-from models import *
-from dataloader import *
-from tensorflow.keras.utils import to_categorical
+import os.path as osp
 import matplotlib.pyplot as plt
-from tensorboardX import SummaryWriter
-from sklearn.metrics import f1_score, precision_score, recall_score,roc_curve,auc,classification_report,confusion_matrix
+from sklearn.metrics import classification_report
 
-# Training settings
-parser = argparse.ArgumentParser()
-parser.add_argument('cuda', action='store_true', default=False,
-                    help='Use CUDA for training.')
-parser.add_argument('--seed', type=int, default=42, help='Random seed.')
-parser.add_argument('--root', type=str, default='/home/linh/Downloads/data/',
-                    help='path to the dataset')
-parser.add_argument('--dataset_name', type=str, default='Mammograms_Prewitt_v1',
-                    help='Dataset name')
-parser.add_argument('--task', type=str, default='graph',
-                    help='choose to classify node or graph')
-parser.add_argument('--batch_size', type=int, default=1024,
-                    help='batch size for loading mini batches of data')
-parser.add_argument('--k_fold', type=int, default=5,
-                    help='set a number of cross validation')
-parser.add_argument('--epochs', type=int, default=100,
-                    help='Number of epochs to train.')
-parser.add_argument('--lr', type=float, default=0.001,
-                    help='Initial learning rate.')
-parser.add_argument('--weight_decay', type=float, default=5e-4,
-                    help='Weight decay for optimizer.')
+#import torch and PYG
+import torch
+from torch_geometric.loader import DataLoader
+from torch_geometric.profile import get_model_size, get_data_size, count_parameters
+
+#import my source code
+from models import *
+from utils import *
+from dataloader import GraphDataset
+
+#Define arguments
+parser = argparse.ArgumentParser(description='PYG version of Mammography Classification')
+
+# Setting Data path and dataset name
+parser.add_argument('--root', type=str, default='/home/linh/Downloads/data/', metavar='DIR',
+                    help='path to dataset')
+parser.add_argument('--dataset_name', type=str, default='BIRAD_Prewitt_v2',
+                    help='Choose dataset to train')
+# Setting hardwares and random seeds
+parser.add_argument('--cuda', action='store_true',
+                    help='use CUDA to train a model')
+parser.add_argument('--seed', type=int, default=42, metavar='S',
+                    help='choose a random seed (default: 42)')
+
+# Setting training parameters
+parser.add_argument('--num_epochs', type=int, default=100, metavar='E',
+                    help='Set numbers of epochs for training (default: 100')
+parser.add_argument('-b','--batch_size', type=int, default=512, metavar='N',
+                    help='input batch size for training (default: 512')
+parser.add_argument('--lr', type=float, default=0.0001, metavar='lr',
+                    help='Set learning rate (default: 0.0001')
+parser.add_argument('--weight_decay', type=float, default=5e-4, metavar='WD',
+                    help='Set weight decay (default: 5-e4')
+
+# Setting model configuration
+parser.add_argument('--layer_name', type=str, default='GraphConv',
+                    help='choose model type either GATConv, GCNConv, or GraphConv (Default: GraphConv')
+parser.add_argument('--c_hidden', type=int, default=64,
+                    help='Choose numbers of output channels (default: 64')
 parser.add_argument('--num_layers', type=int, default=3,
-                    help='set a number of GNN layers')
-parser.add_argument('--hidden_dim', type=int, default=32,
-                    help='Number of hidden units.')
-parser.add_argument('--dropout', type=float, default=0.5,
-                    help='Dropout rate (1 - keep probability).')
-parser.add_argument('--train_split', type=float, default=0.8,
-                    help='Ratio of train split from entire dataset.Rest goes to test set')
+                    help='Choose numbers of Graph layers for the model (default: 3')
+parser.add_argument('--dp_rate_linear', type=float, default=0.5,
+                    help='Set dropout rate at the linear layer (default: 0.5)')
 
-
+parser.add_argument('--dp_rate', type=float, default=0.5,
+                    help='Set dropout rate at every graph layer (default: 0.5)')
 
 args = parser.parse_args()
-if args.cuda:
-	if torch.cuda.is_available():
-		device = torch.device('cuda')
-		torch.cuda.manual_seed(args.seed)
-	else:
-		print("Sorry no gpu found!!")
-		device=torch.device('cpu')
-		print("Running model on cpu")
-else:
-	device=torch.device('cpu')
 
-#Setting seed to reproduce results
+
+if torch.cuda.is_available():
+    if not args.cuda:
+        print("WARNING: You have a CUDA device, so you should probaly run with --cuda")
+    
+    else:
+        device_id = torch.cuda.current_device()
+        print("***** USE DEVICE *****", device_id, torch.cuda.get_device_name(device_id))
+device = torch.device("cuda" if args.cuda else "cpu")
+print("==== DEVICE ====", device)
+
 random.seed(args.seed)
 np.random.seed(args.seed)
 torch.manual_seed(args.seed)
+torch.cuda.manual_seed_all(args.seed)
 
+
+
+#############################
 dataset = GraphDataset(root=args.root, name=args.dataset_name, use_node_attr=True)
 data_size = len(dataset)
-
-#checking some of the data attributes comment out these lines if not needed to check
 #checking some of the data attributes comment out these lines if not needed to check
 print()
-print(f'Dataset: {dataset}:')
-print('====================')
+print(f'Dataset name: {dataset}:')
+print('==================')
 print(f'Number of graphs: {len(dataset)}')
 print(f'Number of features: {dataset.num_features}')
 print(f'Number of classes: {dataset.num_classes}')
 
 data = dataset[0]  # Get the first graph object.
-
 print()
 print(data)
-print('=============================================================')
+print('==================================================')
 
 # Gather some statistics about the first graph.
 print(f'Number of nodes: {data.num_nodes}')
@@ -88,272 +97,153 @@ print(f'Average node degree: {data.num_edges / data.num_nodes:.2f}')
 print(f'Has isolated nodes: {data.has_isolated_nodes()}')
 print(f'Has self-loops: {data.has_self_loops()}')
 print(f'Is undirected: {data.is_undirected()}')
-print("*"*10)
-print(data_size)
-print(dataset.num_features)
-print(args.hidden_dim)
-print(args.dropout)
-print("*"*10)
 
-n_classes=dataset.num_classes
-class_list = []
-for i in range(0, n_classes):
-    class_list.append(i)
-    
-
-#printing confusion matrix
-def show_confusion_matrix(validations, predictions):
-  
-    LABELS=["BIRAD_0","BIRAD_1","BIRAD_2", "BIRAD_3","BIRAD_4A","BIRAD_4B", "BIRAD_4C","BIRAD_5"]
-    matrix = confusion_matrix(validations, predictions)
-    print(matrix)
-
-#applying k-fold cross validation
-def crossvalid(dataset=None,k_fold=5):
-    global precision,recall,f1
-    total_size = len(dataset)
-    fraction   = 1/k_fold
-    seg        = int(total_size * fraction) 
-    index      = 0
-    test_accs  = []
-    train_time = 0
-    test_time  = 0
-    for i in range(k_fold):
-        if(i==k_fold-1):
-            print("Running for {} fold".format(index+1))
-            index=index+1
-            trll = 0
-            trlr = i * seg
-            vall = trlr
-            valr = i * seg + seg
-            trrl = valr
-            trrr = total_size
-            
-            train_left_indices = list(range(trll,trlr))
-            train_right_indices = list(range(trrl,trrr))
-            
-            train_indices = train_left_indices + train_right_indices
-            val_indices = list(range(vall,valr))
-            
-            train_set = torch.utils.data.dataset.Subset(dataset,train_indices)
-            val_set = torch.utils.data.dataset.Subset(dataset,val_indices)
-            
-            print(len(train_set),len(val_set))
-            
-            train_loader = DataLoader(train_set, batch_size=1,
-                                              shuffle=True)
-            val_loader = DataLoader(val_set, batch_size=1,
-                                              shuffle=True)
-                                              
-            
-            model = GNNStack(max(dataset.num_node_features, 1), 32, dataset.num_classes, task=task)
-            opt   = optim.Adam(model.parameters(), lr=0.001)
-            
-            loss_values     = []
-            accuracy_values = []
-            train_start     = time.time()  
-            for epoch in range(1):
-                total_loss = 0
-                model.train()
-                for batch in train_loader:
-                    opt.zero_grad()
-                    embedding, pred, soft= model(batch)
-                    label = batch.y
-                    if task == 'node':
-                        pred  = pred[batch.train_mask]
-                        label = label[batch.train_mask]
-                    loss = model.loss(pred, label)
-                    loss.backward()
-                    opt.step()
-                    total_loss += loss.item() * batch.num_graphs
-                total_loss /= len(train_loader.dataset)
-                writer.add_scalar("loss", total_loss, epoch)
-    
-                if epoch % 1 == 0:
-                    train_acc = test(train_loader, model)
-                    print("Epoch {}. Train Loss: {:.4f}. Train accuracy: {:.4f}".format(epoch, total_loss, train_acc))
-                    loss_values.append(total_loss)
-                    accuracy_values.append(train_acc)
-                    writer.add_scalar("train accuracy", train_acc, epoch)
-            
-                train_end = time.time()
-                print("Time taken for training: ", train_end - train_start)
-                train_time += (train_end - train_start)
-            
-                test_start = time.time()
-            test_acc = test(val_loader, model, True)
-            test_end =time.time()
-            print("Test accuracy: {:.4f}".format(test_acc))
-            print("Time taken for testing: ",test_end - test_start)
-            test_time+=(test_end - test_start)
-            
-            fig = plt.figure(figsize=(5,5))
-            ax  = fig.add_subplot(111)
-            ax.set_title('Training loss and accuracy Vs Epoch')
-            plt.plot(loss_values, color='red',label='Loss')
-            plt.plot(accuracy_values, color='blue',label='Accuracy')
-            ax.set_xlabel('Epoch')
-            ax.set_ylabel('Loss and Accuracy')
-            ax.legend(loc='best')
-            plt.savefig(f"{k_fold}-fold_"+ args.dataset_name + "_" + str(i+1) + ".png")
-            
-            test_accs.append(test_acc)
-                
-    precision  /= k_fold
-    recall     /= k_fold
-    f1         /= k_fold
-    avg_test    = sum(test_accs)/len(test_accs)
-    train_time /= k_fold
-    test_time  /= k_fold
-    print("------------")
-    print("{} fold test accuracy {:.4f}, precision {:.4f}, recall {:.4f}, F1-score {:.4f}".format(k_fold,avg_test,precision,recall,f1))
-    print("Average training time {:.3f}, average testing time {:.3f}".format(train_time,test_time))    
+# Information of Model setting
+print("*"*12)
+#print(f'number of hidden dim: {args.hidden_dim}')
+#print(f'Dropout parameter setting: {args.dropout}')
+print("*"*12)
 
 
-def train(dataset, task, writer):
-    crossvalid(dataset)
-    
-#function for calculating acc for different train-ratio
-def eval_train_ratio(dataset, task, writer):
-    
-    train_ratios     = [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9]
-    test_accuracies  = []
-    train_accuracies = []
-    for tr in train_ratios:
-        if task == 'graph':
-            data_size = len(dataset)
-            train_loader = DataLoader(dataset[:int(data_size * tr)], batch_size=1, shuffle=True)
-            test_loader  = DataLoader(dataset[int(data_size * tr):], batch_size=1, shuffle=True)
-        else:
-            test_loader  = train_loader = DataLoader(dataset, batch_size=64, shuffle=True)
-    
-        print("Train ratio: {:.1f}. No of training graphs: {}. No of testing graphs: {}".format(tr,len(train_loader),len(test_loader)))
-        
-        model = GNNStack(max(dataset.num_node_features, 1), 32, dataset.num_classes, task=task)
-        opt = optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+dataset = dataset.shuffle()
+#this is equivalent of doing
+#perm = torch.randperm(len(dataset))
+#dataset = dataset[perm]
 
-        for epoch in range(10):
-          total_loss = 0
-          model.train()
-          for batch in train_loader:
-            opt.zero_grad()
-            embedding, pred ,_= model(batch)
-            label = batch.y
-            if task == 'node':
-                pred  = pred[batch.train_mask]
-                label = label[batch.train_mask]
-            loss = model.loss(pred, label)
-            loss.backward()
-            opt.step()
-            total_loss += loss.item() * batch.num_graphs
-          total_loss   /= len(train_loader.dataset)
-          
-        
-        train_acc = test(train_loader, model)
-        test_acc  = test(test_loader, model, True)
-        print("Test accuracy: {:.4f}".format(test_acc))
-        test_accuracies.append(test_acc)
-        train_accuracies.append(train_acc)
-        
-    fig = plt.figure(figsize=(7,7))
-    ax  = fig.add_subplot(111)
-    ax.set_title('Training and testing accuracy Vs Train Ratio')
-    plt.plot(train_ratios, train_accuracies, color='red', marker= 'o',label='Train Acc')
-    plt.plot(train_ratios, test_accuracies, color='blue',marker= 'o', label='Test Acc')
-    ax.set_xlabel('Train Ratio')
-    ax.set_ylabel('Training and testing accuracy')
-    ax.legend(loc='best')
-    #plt.show()
-    plt.savefig(f"iterative_training_" + args.dataset_name + ".png")
-    
-def test(loader, model, is_test=False,is_validation=False):
-    global precision,recall,f1
-    global class_list,n_classes
-    global cnt
+train_dataset = dataset[:6700]
+val_dataset = dataset[6700:8150]
+test_dataset = dataset[8150:]
+
+train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+
+for step, data in enumerate(train_loader):
+    print(f'Step {step + 1}:')
+    print('=======')
+    print(f'Number of graphs in the current batch: {data.num_graphs}')
+    print(data)
+    print()
+
+print(f'Number of training graphs: {len(train_dataset)}')
+print(f'Number of val graphs: {len(val_dataset)}')
+print(f'Number of test graphs: {len(test_dataset)}')
+print("**************************")
+
+model = GraphGNNModel(c_in=dataset.num_node_features, 
+                      c_out=dataset.num_classes,
+                      layer_name=args.layer_name, 
+                      c_hidden=args.c_hidden, 
+                      num_layers=args.num_layers, 
+                      dp_rate_linear=args.dp_rate_linear, 
+                      dp_rate=args.dp_rate).to(device)
+print('*****Model size is: ', get_model_size(model))
+print("=====Model parameters are: ", count_parameters(model))
+print(model)
+print("*****Data sizes are: ", get_data_size(data))
+optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+criterion = torch.nn.CrossEntropyLoss()
+
+#@profileit()
+def train():
+    model.train()
+
+    for data in train_loader:  # Iterate in batches over the training dataset.
+        data = data.to(device)
+        label = data.y
+        out = model(data.x, data.edge_index, data.batch)  # Perform a single forward pass.
+        loss = criterion(out, data.y)  # Compute the loss.
+        loss.backward()  # Derive gradients.
+        optimizer.step()  # Update parameters based on gradients.
+        optimizer.zero_grad()  # Clear gradients. 
+
+#@timeit()
+def test(loader):
     model.eval()
     correct = 0
-    glabel  = []
-    glabel1 = []
-    gpred   = []
-    gscore  = []
-    for data in loader:
-        with torch.no_grad():
-            emb, pred,soft = model(data)
-            var=soft.numpy()[0]
-            pred = pred.argmax(dim=1)
-            label = data.y        
-            if(is_test): 
-                glabel.append(label.numpy()[0])
-                glabel1.append(label.numpy())   
-                gpred.append(pred.numpy()[0])
-                gscore.append(var)
- 
-        if model.task == 'node':
-            mask  = data.val_mask if is_validation else data.test_mask
-            pred  = pred[mask]
-            label = data.y[mask]
-            
-        correct += pred.eq(label).sum().item()
-    
-    if model.task == 'graph':
-        total = len(loader.dataset) 
-    else:
-        total = 0
-        for data in loader.dataset:
-            total += torch.sum(data.test_mask).item()
-    
-    if(is_test):
-        glabel  = np.array(glabel)
-        glabel1 = np.array(glabel1)
-        gpred   = np.array(gpred)
-        gscore  = np.array(gscore)
-        enlabel = to_categorical(glabel1,n_classes)
-     
-        p      = precision_score(glabel, gpred, average="micro")
-        r      = recall_score(glabel, gpred, average="micro")
-        f      = f1_score(glabel, gpred, average="micro")
-        
-        print('F1: {}'.format(f))
-        print('Precision: {}'.format(p))
-        print('Recall: {}'.format(r))
-        precision += p
-        recall    += r
-        f1        += f
-        
-        print("\n...confusion matrix and classification report....\n")
-        show_confusion_matrix(glabel,gpred)
-        print(classification_report(glabel,gpred))
+    y_pred = []
+    y_true = []
+    for data in loader:  # Iterate in batches over the training/test dataset.
+        data = data.to(device)
+        out = model(data.x, data.edge_index, data.batch)  
+        pred = out.argmax(dim=1)  # Use the class with highest probability.
+        correct += int((pred == data.y).sum())  # Check against ground-truth labels
 
-        #generate roc curve
-        tpr     = dict()
-        fpr     = dict()
-        roc_auc = dict()
-        for i in range(n_classes):
-            fpr[i], tpr[i], _= roc_curve(enlabel[:, i], gscore[:, i])
-            roc_auc[i] = auc(fpr[i], tpr[i])
-        fig = plt.figure(figsize=(5,5))
-        ax = fig.add_subplot(111)
-        ax.set_title('ROC curve for all classes')
-        colors=['red','blue','green','yellow','purple','orange', 'black', 'pink']
-        for i in range(n_classes):
-            plt.plot(fpr[i], tpr[i], color=colors[i],lw=2,label='ROC curve of class {0} (area = {1:0.2f})'
-             ''.format(i, roc_auc[i]))    
-        ax.set_xlabel('False postive rate')
-        ax.set_ylabel('True postive rate')
-        ax.legend(loc='best')
-        plt.savefig(f"roc_" + args.dataset_name + "_" + str(cnt) + ".png")
-        cnt+=1
+        y_true.extend(data.y.cpu().numpy())
+        y_pred.extend(np.squeeze(pred.cpu().numpy().T))
+    report = classification_report(y_true, y_pred, digits=4)
+    print(report)   
+    return correct / len(loader.dataset) # Derive ratio of correct predictions.
+
+
+start = time.time()
+best_val_acc = 0.9
+train_accs, val_accs = [], []
+for epoch in range(1, args.num_epochs):
+    train()
+    train_acc = test(train_loader)
+    val_acc = test(val_loader)
+
+    if val_acc > best_val_acc:
+        best_val_acc = val_acc
+        save_weight_path = osp.join(args.root + "weights/Graph_" + args.layer_name + "_" + args.dataset_name + "_best" + ".pth")
+        print('New best model saved to:', save_weight_path)
+        torch.save(model.state_dict(), save_weight_path)
+
+    if epoch % 10 == 0:
+        print(f'Epoch: {epoch:03d}, Train Acc: {train_acc:.4f}, Validation Acc: {val_acc:.4f}')
+    
+    train_accs.append(train_acc)
+    val_accs.append(val_acc)
+# Visualization at the end of training
+fig, ax = plt.subplots()
+ax.plot(train_accs, c="steelblue", label="Training")
+ax.plot(val_accs, c="orangered", label="Validation")
+ax.grid()
+ax.legend()
+ax.set_xlabel('Epoch')
+ax.set_ylabel('Accuracy')
+ax.legend(loc='best')
+ax.set_title("Accuracy evolution")
+#plt.show()
+plt.savefig(args.root + "results/Evolution_training_" + args.layer_name + "_" + args.dataset_name + ".png")
         
-    return correct / total
-if __name__ == '__main__':
-    dataset   = dataset.shuffle()
-    task      = args.task #'graph'
-    writer    = SummaryWriter("./log/" + datetime.now().strftime("%Y%m%d-%H%M%S"))
-    #globals 
-    precision = 0
-    recall    = 0
-    f1        = 0
-    cnt       = 1
-    train(dataset, task, writer)
-    eval_train_ratio(dataset, task, writer)
+end = time.time()
+time_to_train = (end - start)/60
+print("Total training time to train on GPU (min):", time_to_train)
+print("****End training process here******")
+
+
+def inference(loader):
+    model.eval()
+    correct = 0
+    y_pred = []
+    y_true = []
+    for data in loader:  # Iterate in batches over the training/test dataset.
+        data = data.to(device)
+        out = model(data.x, data.edge_index, data.batch)  
+        pred = out.argmax(dim=1)  # Use the class with highest probability.
+        #correct += int((pred == data.y).sum())  # Check against ground-truth labels
+
+        y_true.extend(data.y.cpu().numpy())
+        y_pred.extend(np.squeeze(pred.cpu().numpy().T))
+    report = classification_report(y_true, y_pred, digits=4)
+    print(report)
+    cm = confusion_matrix(y_true, y_pred)
+    # plot the confusion matrix
+    if dataset.num_classes == 4:
+        display_labels = ['Type A', 'Type B', 'Type C', 'Type D']
+    else:
+        display_labels = ['BIRAD_0', 'BIRAD_1', 'BIRAD_2','BIRAD_3','BIRAD_4A','BIRAD_4B','BIRAD_4C','BIRAD_5']
+    plot_cm(cm=cm, display_labels=display_labels)
+    #return torch.sum(y_pred == y_true).item() / len(y_true)      
+    return correct / len(loader.dataset) # Derive ratio of correct predictions.
+
+# Inference test set
+print("******Start inference on test set*****")
+start_2 = time.time()
+inference(test_loader)
+end_2 = time.time()
+time_to_train_2 = (end_2 - start_2)/60
+print("Total Inference time to train on GPU (min):", time_to_train_2)
 
