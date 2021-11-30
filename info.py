@@ -31,14 +31,8 @@ parser.add_argument('--seed', type=int, default=42, metavar='S',
                     help='choose a random seed (default: 42)')
 
 # Setting training parameters
-parser.add_argument('--num_epochs', type=int, default=100, metavar='E',
-                    help='Set numbers of epochs for training (default: 100')
 parser.add_argument('-b','--batch_size', type=int, default=512, metavar='N',
                     help='input batch size for training (default: 512')
-parser.add_argument('--lr', type=float, default=0.0001, metavar='lr',
-                    help='Set learning rate (default: 0.0001')
-parser.add_argument('--weight_decay', type=float, default=5e-4, metavar='WD',
-                    help='Set weight decay (default: 5-e4')
 
 # Setting model configuration
 parser.add_argument('--layer_name', type=str, default='GraphConv',
@@ -49,7 +43,6 @@ parser.add_argument('--num_layers', type=int, default=3,
                     help='Choose numbers of Graph layers for the model (default: 3')
 parser.add_argument('--dp_rate_linear', type=float, default=0.5,
                     help='Set dropout rate at the linear layer (default: 0.5)')
-
 parser.add_argument('--dp_rate', type=float, default=0.5,
                     help='Set dropout rate at every graph layer (default: 0.5)')
 
@@ -140,5 +133,3 @@ print('*****Model size is: ', get_model_size(model))
 print("=====Model parameters are: ", count_parameters(model))
 print(model)
 print("*****Data sizes are: ", get_data_size(data))
-optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
-criterion = torch.nn.CrossEntropyLoss()
