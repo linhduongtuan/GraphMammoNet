@@ -1,25 +1,80 @@
+#import general packages
 import time
+import random
 import numpy as np
+import argparse
+import os.path as osp
+import matplotlib.pyplot as plt
+
+#import torch and PYG
 import torch
-import torch.nn as nn
 from torch_geometric.loader import DataLoader
 from torch_geometric.profile import get_model_size, get_data_size, count_parameters
-import matplotlib.pyplot as plt
-from models import *
-from dataloader import GraphDataset
-from utils import *
-import os.path as osp
-from sklearn.metrics import classification_report
 
-dataset_name = 'Type_Prewitt_v1'
-gnn_layer_by_name = {
-    "GCN"      : GCNConv,
-    "GAT"      : GATConv,
-    "GraphConv": GraphConv
-}
-layer_name = "GraphConv"
-batch_size=512
-dataset = GraphDataset(root='/home/linh/Downloads/data/', name=dataset_name, use_node_attr=True)
+#import my source code
+from models import *
+from utils import *
+from dataloader import GraphDataset
+
+#Define arguments
+parser = argparse.ArgumentParser(description='PYG version of Mammography Classification')
+
+# Setting Data path and dataset name
+parser.add_argument('--root', type=str, default='/home/linh/Downloads/data/', metavar='DIR',
+                    help='path to dataset')
+parser.add_argument('--dataset_name', type=str, default='BIRAD_Prewitt_v2',
+                    help='Choose dataset to train')
+# Setting hardwares and random seeds
+parser.add_argument('--cuda', action='store_true',
+                    help='use CUDA to train a model')
+parser.add_argument('--seed', type=int, default=42, metavar='S',
+                    help='choose a random seed (default: 42)')
+
+# Setting training parameters
+parser.add_argument('--num_epochs', type=int, default=100, metavar='E',
+                    help='Set numbers of epochs for training (default: 100')
+parser.add_argument('-b','--batch_size', type=int, default=512, metavar='N',
+                    help='input batch size for training (default: 512')
+parser.add_argument('--lr', type=float, default=0.0001, metavar='lr',
+                    help='Set learning rate (default: 0.0001')
+parser.add_argument('--weight_decay', type=float, default=5e-4, metavar='WD',
+                    help='Set weight decay (default: 5-e4')
+
+# Setting model configuration
+parser.add_argument('--layer_name', type=str, default='GraphConv',
+                    help='choose model type either GATConv, GCNConv, or GraphConv (Default: GraphConv')
+parser.add_argument('--c_hidden', type=int, default=64,
+                    help='Choose numbers of output channels (default: 64')
+parser.add_argument('--num_layers', type=int, default=3,
+                    help='Choose numbers of Graph layers for the model (default: 3')
+parser.add_argument('--dp_rate_linear', type=float, default=0.5,
+                    help='Set dropout rate at the linear layer (default: 0.5)')
+
+parser.add_argument('--dp_rate', type=float, default=0.5,
+                    help='Set dropout rate at every graph layer (default: 0.5)')
+
+args = parser.parse_args()
+
+
+if torch.cuda.is_available():
+    if not args.cuda:
+        print("WARNING: You have a CUDA device, so you should probaly run with --cuda")
+    
+    else:
+        device_id = torch.cuda.current_device()
+        print("***** USE DEVICE *****", device_id, torch.cuda.get_device_name(device_id))
+device = torch.device("cuda" if args.cuda else "cpu")
+print("==== DEVICE ====", device)
+
+random.seed(args.seed)
+np.random.seed(args.seed)
+torch.manual_seed(args.seed)
+torch.cuda.manual_seed_all(args.seed)
+
+
+
+#############################
+dataset = GraphDataset(root=args.root, name=args.dataset_name, use_node_attr=True)
 data_size = len(dataset)
 #checking some of the data attributes comment out these lines if not needed to check
 print()
@@ -48,7 +103,7 @@ print("*"*12)
 #print(f'Dropout parameter setting: {args.dropout}')
 print("*"*12)
 
-torch.manual_seed(12345)
+
 dataset = dataset.shuffle()
 #this is equivalent of doing
 #perm = torch.randperm(len(dataset))
@@ -58,9 +113,9 @@ train_dataset = dataset[:6700]
 val_dataset = dataset[6700:8150]
 test_dataset = dataset[8150:]
 
-train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
+val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
 for step, data in enumerate(train_loader):
     print(f'Step {step + 1}:')
@@ -73,16 +128,17 @@ print(f'Number of training graphs: {len(train_dataset)}')
 print(f'Number of val graphs: {len(val_dataset)}')
 print(f'Number of test graphs: {len(test_dataset)}')
 print("**************************")
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 model = GraphGNNModel(c_in=dataset.num_node_features, 
-                      c_out=dataset.num_classes, 
-                      c_hidden=64, 
-                      layer_name=layer_name, 
-                      num_layers=3, 
-                      dp_rate_linear=0.5, 
-                      dp_rate=0.5).to(device)
+                      c_out=dataset.num_classes,
+                      layer_name=args.layer_name, 
+                      c_hidden=args.c_hidden, 
+                      num_layers=args.num_layers, 
+                      dp_rate_linear=args.dp_rate_linear, 
+                      dp_rate=args.dp_rate).to(device)
 print('*****Model size is: ', get_model_size(model))
 print("=====Model parameters are: ", count_parameters(model))
 print(model)
 print("*****Data sizes are: ", get_data_size(data))
+optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+criterion = torch.nn.CrossEntropyLoss()
