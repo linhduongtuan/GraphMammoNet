@@ -23,7 +23,7 @@ parser = argparse.ArgumentParser(description='PYG version of Mammography Classif
 # Setting Data path and dataset name
 parser.add_argument('--root', type=str, default='/home/linh/Downloads/data/', metavar='DIR',
                     help='path to dataset')
-parser.add_argument('--dataset_name', type=str, default='BIRAD_Prewitt_v1',
+parser.add_argument('--dataset_name', type=str, default='BIRAD_Prewitt_v2',
                     help='Choose dataset to train')
 
 # Setting hardwares and random seeds
@@ -41,6 +41,8 @@ parser.add_argument('--lr', type=float, default=0.001, metavar='lr',
                     help='Set learning rate (default: 0.001')
 parser.add_argument('--weight_decay', type=float, default=5e-4, metavar='WD',
                     help='Set weight decay (default: 5-e4')
+parser.add_argument('--step_size', type=int, default=20, metavar='SS',
+                    help='Set step size for scheduler of learning rate (default: 20')
 
 # Setting model configuration
 parser.add_argument('--layer_name', type=str, default='GraphConv',
@@ -147,6 +149,7 @@ print(model)
 print("*****Data sizes are: ", get_data_size(data))
 optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 criterion = torch.nn.CrossEntropyLoss()
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=0.5)
 
 #@profileit()
 def train():
@@ -186,6 +189,7 @@ for epoch in range(1, args.num_epochs):
     train()
     train_acc = test(train_loader)
     val_acc = test(val_loader)
+    scheduler.step()
 
     if val_acc > best_val_acc:
         best_val_acc = val_acc
