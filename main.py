@@ -23,8 +23,9 @@ parser = argparse.ArgumentParser(description='PYG version of Mammography Classif
 # Setting Data path and dataset name
 parser.add_argument('--root', type=str, default='/home/linh/Downloads/data/', metavar='DIR',
                     help='path to dataset')
-parser.add_argument('--dataset_name', type=str, default='BIRAD_Prewitt_v2',
+parser.add_argument('--dataset_name', type=str, default='BIRAD_Prewitt_v1',
                     help='Choose dataset to train')
+
 # Setting hardwares and random seeds
 parser.add_argument('--cuda', action='store_true',
                     help='use CUDA to train a model')
@@ -34,23 +35,22 @@ parser.add_argument('--seed', type=int, default=42, metavar='S',
 # Setting training parameters
 parser.add_argument('--num_epochs', type=int, default=100, metavar='E',
                     help='Set numbers of epochs for training (default: 100')
-parser.add_argument('-b','--batch_size', type=int, default=512, metavar='N',
-                    help='input batch size for training (default: 512')
-parser.add_argument('--lr', type=float, default=0.0001, metavar='lr',
-                    help='Set learning rate (default: 0.0001')
+parser.add_argument('-b','--batch_size', type=int, default=1024, metavar='B',
+                    help='input batch size for training (default: 1024')
+parser.add_argument('--lr', type=float, default=0.001, metavar='lr',
+                    help='Set learning rate (default: 0.001')
 parser.add_argument('--weight_decay', type=float, default=5e-4, metavar='WD',
                     help='Set weight decay (default: 5-e4')
 
 # Setting model configuration
 parser.add_argument('--layer_name', type=str, default='GraphConv',
-                    help='choose model type either GATConv, GCNConv, or GraphConv (Default: GraphConv')
+                    help='choose model type either GAT, GCN, or GraphConv (Default: GraphConv')
 parser.add_argument('--c_hidden', type=int, default=64,
                     help='Choose numbers of output channels (default: 64')
 parser.add_argument('--num_layers', type=int, default=3,
                     help='Choose numbers of Graph layers for the model (default: 3')
 parser.add_argument('--dp_rate_linear', type=float, default=0.5,
                     help='Set dropout rate at the linear layer (default: 0.5)')
-
 parser.add_argument('--dp_rate', type=float, default=0.5,
                     help='Set dropout rate at every graph layer (default: 0.5)')
 
@@ -71,8 +71,6 @@ random.seed(args.seed)
 np.random.seed(args.seed)
 torch.manual_seed(args.seed)
 torch.cuda.manual_seed_all(args.seed)
-
-
 
 #############################
 dataset = GraphDataset(root=args.root, name=args.dataset_name, use_node_attr=True)
@@ -109,14 +107,20 @@ dataset = dataset.shuffle()
 #this is equivalent of doing
 #perm = torch.randperm(len(dataset))
 #dataset = dataset[perm]
+if dataset.num_classes == 8:
+    train_dataset = dataset[6743:]
+    val_dataset   = dataset[6743:8187]
+    test_dataset  = dataset[8187:]
+else:
+    train_dataset = dataset[6642:]
+    val_dataset   = dataset[6642:8065]
+    test_dataset  = dataset[8065:]
 
-train_dataset = dataset[:6700]
-val_dataset = dataset[6700:8150]
-test_dataset = dataset[8150:]
+
 
 train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
-test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+val_loader   = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
+test_loader  = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
 for step, data in enumerate(train_loader):
     print(f'Step {step + 1}:')
@@ -150,7 +154,6 @@ def train():
 
     for data in train_loader:  # Iterate in batches over the training dataset.
         data = data.to(device)
-        label = data.y
         out = model(data.x, data.edge_index, data.batch)  # Perform a single forward pass.
         loss = criterion(out, data.y)  # Compute the loss.
         loss.backward()  # Derive gradients.
@@ -191,7 +194,7 @@ for epoch in range(1, args.num_epochs):
         torch.save(model.state_dict(), save_weight_path)
 
     if epoch % 10 == 0:
-        print(f'Epoch: {epoch:03d}, Train Acc: {train_acc:.4f}, Validation Acc: {val_acc:.4f}')
+        print(f'Epoch numbers: {epoch:03d}, Train Acc: {train_acc:.4f}, Validation Acc: {val_acc:.4f}')
     
     train_accs.append(train_acc)
     val_accs.append(val_acc)
@@ -201,7 +204,7 @@ ax.plot(train_accs, c="steelblue", label="Training")
 ax.plot(val_accs, c="orangered", label="Validation")
 ax.grid()
 ax.legend()
-ax.set_xlabel('Epoch')
+ax.set_xlabel('Epoch Numbers')
 ax.set_ylabel('Accuracy')
 ax.legend(loc='best')
 ax.set_title("Accuracy evolution")
