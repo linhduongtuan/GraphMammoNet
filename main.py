@@ -32,6 +32,8 @@ parser.add_argument('--cuda', action='store_true',
                     help='use CUDA to train a model')
 parser.add_argument('--seed', type=int, default=42, metavar='S',
                     help='choose a random seed (default: 42)')
+parser.add_argument('--num_workers', type=int, default=4,
+                    help='set number of workers (default: 4)')
 
 # Setting training parameters
 parser.add_argument('--num_epochs', type=int, default=100, metavar='E',
@@ -121,9 +123,9 @@ else:
 
 
 
-train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True)
-val_loader   = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True)
-test_loader  = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+val_loader   = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.num_workers)
+test_loader  = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.num_workers)
 
 for step, data in enumerate(train_loader):
     print(f'Step {step + 1}:')
