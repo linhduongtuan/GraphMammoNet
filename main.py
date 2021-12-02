@@ -82,8 +82,8 @@ dataset = GraphDataset(root=args.root, name=args.dataset_name, use_node_attr=Tru
 data_size = len(dataset)
 #checking some of the data attributes comment out these lines if not needed to check
 print()
-print(f'Dataset name: {dataset}:')
-print('==================')
+print(f'Dataset name: {dataset}')
+print('###############################')
 print(f'Number of graphs: {len(dataset)}')
 print(f'Number of features: {dataset.num_features}')
 print(f'Number of classes: {dataset.num_classes}')
