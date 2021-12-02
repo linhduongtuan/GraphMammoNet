@@ -4,6 +4,7 @@ import random
 import numpy as np
 import argparse
 import os.path as osp
+from tqdm import tqdm
 import matplotlib.pyplot as plt
 from sklearn.metrics import classification_report
 
@@ -155,7 +156,7 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size,
 def train():
     model.train()
 
-    for data in train_loader:  # Iterate in batches over the training dataset.
+    for data in tqdm(train_loader, desc="Iteration"):  # Iterate in batches over the training dataset.
         data = data.to(device)
         out = model(data.x, data.edge_index, data.batch)  # Perform a single forward pass.
         loss = criterion(out, data.y)  # Compute the loss.
@@ -169,7 +170,7 @@ def test(loader):
     correct = 0
     y_pred = []
     y_true = []
-    for data in loader:  # Iterate in batches over the training/test dataset.
+    for data in tqdm(loader, desc="Iteration"):  # Iterate in batches over the training/test dataset.
         data = data.to(device)
         out = model(data.x, data.edge_index, data.batch)  
         pred = out.argmax(dim=1)  # Use the class with highest probability.
