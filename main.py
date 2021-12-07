@@ -25,12 +25,11 @@ from dataloader import GraphDataset
 parser = argparse.ArgumentParser(description='PYG version of Mammography Classification')
 
 # Setting Data path and dataset name
-parser.add_argument('--root', type=str, default='/home/linh/Downloads/OCT/', metavar='DIR',
+parser.add_argument('--root', type=str, default='/home/linh/Downloads/data/', metavar='DIR',
                     help='path to dataset')
-parser.add_argument('--training_dataset_name', type=str, default='Trainset_Prewitt_v2_224',
+parser.add_argument('--training_dataset_name', type=str, default='Prewitt_v2',
                     help='Choose dataset to train')
-parser.add_argument('--testing_dataset_name', type=str, default='Testset_Prewitt_v2_224',
-                    help='Choose dataset to train')
+
 # Setting hardwares and random seeds
 parser.add_argument('--cuda', action='store_true',
                     help='use CUDA to train a model')
