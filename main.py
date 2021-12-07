@@ -13,8 +13,7 @@ import torch
 from torch.cuda.amp import autocast, GradScaler
 from torch_geometric.loader import DataLoader
 from torch_geometric.profile import get_model_size, get_data_size, count_parameters
-from timm.optim import create_optimizer_v2, optimizer_kwargs
-from timm.scheduler import create_scheduler
+
 
 #import my source code
 from models import *
@@ -37,67 +36,22 @@ parser.add_argument('--seed', type=int, default=42, metavar='S',
                     help='choose a random seed (default: 42)')
 parser.add_argument('--num_workers', type=int, default=4,
                     help='set number of workers (default: 4)')
-# Optimizer parameters
-parser.add_argument('--opt', default='rmsproptf', type=str, metavar='OPTIMIZER',
-                    help='Optimizer (default: "rmsproptf"')
-parser.add_argument('--opt-eps', default=None, type=float, metavar='EPSILON',
-                    help='Optimizer Epsilon (default: None, use opt default)')
-parser.add_argument('--opt-betas', default=None, type=float, nargs='+', metavar='BETA',
-                    help='Optimizer Betas (default: None, use opt default)')
-parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
-                    help='Optimizer momentum (default: 0.9)')
-parser.add_argument('--weight-decay', type=float, default=2e-5,
-                    help='weight decay (default: 2e-5)')
-parser.add_argument('--clip-grad', type=float, default=None, metavar='NORM',
-                    help='Clip gradient norm (default: None, no clipping)')
-parser.add_argument('--clip-mode', type=str, default='norm',
-                    help='Gradient clipping mode. One of ("norm", "value", "agc")')
-            
+    
 # Learning rate schedule parameters
 parser.add_argument('-b','--batch_size', type=int, default=4048, metavar='B',
                     help='input batch size for training (default: 2048')
 
 parser.add_argument('--step_size', type=int, default=20, metavar='SS',
                     help='Set step size for scheduler of learning rate (default: 20')
-parser.add_argument('--sched', default='cosine', type=str, metavar='SCHEDULER',
-                    help='LR scheduler (default: "cosine"')
-parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
-                    help='learning rate (default: 0.01)')
-parser.add_argument('--lr-noise', type=float, nargs='+', default=None, metavar='pct, pct',
-                    help='learning rate noise on/off epoch percentages')
-parser.add_argument('--lr-noise-pct', type=float, default=0.67, metavar='PERCENT',
-                    help='learning rate noise limit percent (default: 0.67)')
-parser.add_argument('--lr-noise-std', type=float, default=1.0, metavar='STDDEV',
-                    help='learning rate noise std-dev (default: 1.0)')
-parser.add_argument('--lr-cycle-mul', type=float, default=1.0, metavar='MULT',
-                    help='learning rate cycle len multiplier (default: 1.0)')
-parser.add_argument('--lr-cycle-decay', type=float, default=0.5, metavar='MULT',
-                    help='amount to decay each learning rate cycle (default: 0.5)')
-parser.add_argument('--lr-cycle-limit', type=int, default=1, metavar='N',
-                    help='learning rate cycle limit, cycles enabled if > 1')
-parser.add_argument('--lr-k-decay', type=float, default=1.0,
-                    help='learning rate k-decay for cosine/poly (default: 1.0)')
-parser.add_argument('--warmup-lr', type=float, default=0.0001, metavar='LR',
-                    help='warmup learning rate (default: 0.0001)')
-parser.add_argument('--min-lr', type=float, default=1e-6, metavar='LR',
-                    help='lower lr bound for cyclic schedulers that hit 0 (1e-5)')
+
 parser.add_argument('--epochs', type=int, default=100, metavar='N',
                     help='number of epochs to train (default: 100)')
-parser.add_argument('--epoch-repeats', type=float, default=0., metavar='N',
-                    help='epoch repeat multiplier (number of times to repeat dataset epoch per train epoch).')
-parser.add_argument('--start-epoch', default=None, type=int, metavar='N',
-                    help='manual epoch number (useful on restarts)')
-parser.add_argument('--decay-epochs', type=float, default=100, metavar='N',
-                    help='epoch interval to decay LR')
-parser.add_argument('--warmup-epochs', type=int, default=3, metavar='N',
-                    help='epochs to warmup LR, if scheduler supports')
-parser.add_argument('--cooldown-epochs', type=int, default=10, metavar='N',
-                    help='epochs to cooldown LR at min_lr, after cyclic schedule ends')
-parser.add_argument('--patience-epochs', type=int, default=10, metavar='N',
-                    help='patience epochs for Plateau LR scheduler (default: 10')
 parser.add_argument('--decay-rate', '--dr', type=float, default=0.1, metavar='RATE',
                     help='LR decay rate (default: 0.1)')
-                    
+parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
+                    help='Optimizer momentum (default: 0.9)')
+parser.add_argument('--weight_decay', type=float, default=2e-5,
+                    help='weight decay (default: 2e-5)')
 args = parser.parse_args()
 
 if torch.cuda.is_available():
@@ -188,10 +142,9 @@ print('*****Model size is: ', get_model_size(model))
 print("=====Model parameters are: ", count_parameters(model))
 print(model)
 print("*****Data sizes are: ", get_data_size(data))
-optimizer = create_optimizer_v2(model, **optimizer_kwargs(cfg=args))
-scheduler, epochs = create_scheduler(args, optimizer)
+optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 criterion = torch.nn.CrossEntropyLoss()
-#scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=0.5)
+scheduler = torch.optim.lr_scheduler.StepLR(step_size=args.step_size, gamma=0.1)
 scaler = GradScaler()
 
 #@profileit()
@@ -213,7 +166,6 @@ def train():
         scaler.step(optimizer)
         scaler.update()
 
-        
 #@timeit()
 def test(loader):
     model.eval()
@@ -236,11 +188,11 @@ def test(loader):
 start = time.time()
 best_val_acc = 0.9
 train_accs, val_accs = [], []
-for epoch in range(1, args.epochs):
+for epoch in range(1, args.num_epochs):
     train()
     train_acc = test(train_loader)
     val_acc = test(val_loader)
-    scheduler.step(epoch=1)
+    scheduler.step()
 
     if val_acc > best_val_acc:
         best_val_acc = val_acc
