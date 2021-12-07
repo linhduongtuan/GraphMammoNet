@@ -52,6 +52,21 @@ parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
                     help='Optimizer momentum (default: 0.9)')
 parser.add_argument('--weight_decay', type=float, default=2e-5,
                     help='weight decay (default: 2e-5)')
+                    
+                    
+# Setting model configuration
+parser.add_argument('--layer_name', type=str, default='GraphConv',
+                    help='choose model type either GAT, GCN, or GraphConv (Default: GraphConv')
+parser.add_argument('--c_hidden', type=int, default=64,
+                    help='Choose numbers of output channels (default: 64')
+parser.add_argument('--num_layers', type=int, default=3,
+                    help='Choose numbers of Graph layers for the model (default: 3')
+parser.add_argument('--dp_rate_linear', type=float, default=0.5,
+                    help='Set dropout rate at the linear layer (default: 0.5)')
+parser.add_argument('--dp_rate', type=float, default=0.5,
+                    help='Set dropout rate at every graph layer (default: 0.5)')
+
+
 args = parser.parse_args()
 
 if torch.cuda.is_available():
@@ -196,7 +211,7 @@ for epoch in range(1, args.epochs):
 
     if val_acc > best_val_acc:
         best_val_acc = val_acc
-        save_weight_path = osp.join(args.root + "weights/Graph_" + args.layer_name + "_" + args.training_dataset_name + "_best" + ".pth")
+        save_weight_path = osp.join(args.root + "weights/Graph_" + args.layer_name + "_" + args.dataset_name + "_best" + ".pth")
         print('New best model saved to:', save_weight_path)
         torch.save(model.state_dict(), save_weight_path)
 
