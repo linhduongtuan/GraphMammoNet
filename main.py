@@ -144,7 +144,7 @@ print(model)
 print("*****Data sizes are: ", get_data_size(data))
 optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 criterion = torch.nn.CrossEntropyLoss()
-scheduler = torch.optim.lr_scheduler.StepLR(step_size=args.step_size, gamma=0.1)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=0.1)
 scaler = GradScaler()
 
 #@profileit()
@@ -153,18 +153,18 @@ def train():
 
     for data in tqdm(train_loader, desc="Iteration"):  # Iterate in batches over the training dataset.
         data = data.to(device)
-        #out = model(data.x, data.edge_index, data.batch)  # Perform a single forward pass.
-        #loss = criterion(out, data.y)  # Compute the loss.
-        #loss.backward()  # Derive gradients.
-        #optimizer.step()  # Update parameters based on gradients.
+        out = model(data.x, data.edge_index, data.batch)  # Perform a single forward pass.
+        loss = criterion(out, data.y)  # Compute the loss.
+        loss.backward()  # Derive gradients.
+        optimizer.step()  # Update parameters based on gradients.
         optimizer.zero_grad()  # Clear gradients. 
-        with autocast():
-            out = model(data.x, data.edge_index, data.batch)
-            loss = criterion(out, data.y)
+        #with autocast():
+        #    out = model(data.x, data.edge_index, data.batch)
+        #    loss = criterion(out, data.y)
 
-        scaler.scale(loss).backward()
-        scaler.step(optimizer)
-        scaler.update()
+        #scaler.scale(loss).backward()
+        #scaler.step(optimizer)
+        #scaler.update()
 
 #@timeit()
 def test(loader):
@@ -188,7 +188,7 @@ def test(loader):
 start = time.time()
 best_val_acc = 0.9
 train_accs, val_accs = [], []
-for epoch in range(1, args.num_epochs):
+for epoch in range(1, args.epochs):
     train()
     train_acc = test(train_loader)
     val_acc = test(val_loader)
