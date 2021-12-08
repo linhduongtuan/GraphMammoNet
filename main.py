@@ -26,24 +26,22 @@ parser = argparse.ArgumentParser(description='PYG version of Mammography Classif
 # Setting Data path and dataset name
 parser.add_argument('--root', type=str, default='/home/linh/Downloads/data/', metavar='DIR',
                     help='path to dataset')
-parser.add_argument('--training_dataset_name', type=str, default='Prewitt_v2',
+parser.add_argument('--dataset_name', type=str, default='Prewitt_v2',
                     help='Choose dataset to train')
 
 # Setting hardwares and random seeds
-parser.add_argument('--cuda', action='store_true',
-                    help='use CUDA to train a model')
+parser.add_argument('--cuda', action='store_true', default=True,
+                    help='use CUDA to train a model (default: True)')
 parser.add_argument('--seed', type=int, default=42, metavar='S',
                     help='choose a random seed (default: 42)')
 parser.add_argument('--num_workers', type=int, default=4,
                     help='set number of workers (default: 4)')
     
 # Learning rate schedule parameters
-parser.add_argument('-b','--batch_size', type=int, default=4048, metavar='B',
+parser.add_argument('-b','--batch_size', type=int, default=2048, metavar='B',
                     help='input batch size for training (default: 2048')
-
 parser.add_argument('--step_size', type=int, default=20, metavar='SS',
                     help='Set step size for scheduler of learning rate (default: 20')
-
 parser.add_argument('--epochs', type=int, default=100, metavar='N',
                     help='number of epochs to train (default: 100)')
 parser.add_argument('--decay-rate', '--dr', type=float, default=0.1, metavar='RATE',
@@ -153,14 +151,16 @@ model = GraphGNNModel(c_in=dataset.num_node_features,
                       num_layers=args.num_layers, 
                       dp_rate_linear=args.dp_rate_linear, 
                       dp_rate=args.dp_rate).to(device)
+                      
 print('*****Model size is: ', get_model_size(model))
 print("=====Model parameters are: ", count_parameters(model))
 print(model)
 print("*****Data sizes are: ", get_data_size(data))
+
 optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 criterion = torch.nn.CrossEntropyLoss()
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=0.1)
-scaler = GradScaler()
+
 
 #@profileit()
 def train():
@@ -173,13 +173,6 @@ def train():
         loss.backward()  # Derive gradients.
         optimizer.step()  # Update parameters based on gradients.
         optimizer.zero_grad()  # Clear gradients. 
-        #with autocast():
-        #    out = model(data.x, data.edge_index, data.batch)
-        #    loss = criterion(out, data.y)
-
-        #scaler.scale(loss).backward()
-        #scaler.step(optimizer)
-        #scaler.update()
 
 #@timeit()
 def test(loader):
