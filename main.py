@@ -195,7 +195,7 @@ def test(val_loader):
     
     report = classification_report(y_true, y_pred, digits=4)
     print(report)   
-    return correct / len(val_loader.dataset), val_losses.append(val_loss) # Derive ratio of correct predictions.
+    return correct / len(val_loader.dataset), val_loss # Derive ratio of correct predictions.
 
 
 start = time.time()
