@@ -161,11 +161,10 @@ optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.w
 criterion = torch.nn.CrossEntropyLoss()
 scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size, gamma=0.1)
 
-
 #@profileit()
 def train():
     model.train()
-
+    running_loss = 0
     for data in tqdm(train_loader, desc=(f'Training epoch: {epoch:04d}')):  # Iterate in batches over the training dataset.
         data = data.to(device)
         out = model(data.x, data.edge_index, data.batch)  # Perform a single forward pass.
@@ -173,33 +172,44 @@ def train():
         loss.backward()  # Derive gradients.
         optimizer.step()  # Update parameters based on gradients.
         optimizer.zero_grad()  # Clear gradients. 
+        running_loss += loss.item() #* data.num_graphs
+    train_loss = running_loss/len(train_loader)
+    train_losses.append(train_loss)
 
 #@timeit()
-def test(loader):
+def test(val_loader):
     model.eval()
     correct = 0
     y_pred = []
     y_true = []
-    for data in tqdm(loader, desc=(f'Testing epoch: {epoch:04d}')):  # Iterate in batches over the training/test dataset.
+    running_loss = 0
+    for data in tqdm(val_loader, desc=(f'Training epoch: {epoch:04d}')):  # Iterate in batches over the training/test dataset.
         data = data.to(device)
-        out = model(data.x, data.edge_index, data.batch)  
+        out = model(data.x, data.edge_index, data.batch) 
+        loss = criterion(out, data.y) 
         pred = out.argmax(dim=1)  # Use the class with highest probability.
         correct += int((pred == data.y).sum())  # Check against ground-truth labels
 
         y_true.extend(data.y.cpu().numpy())
         y_pred.extend(np.squeeze(pred.cpu().numpy().T))
+        running_loss += loss.item() #* data.num_graphs
+    val_loss = running_loss/len(val_loader)
+    
     report = classification_report(y_true, y_pred, digits=4)
     print(report)   
-    return correct / len(loader.dataset) # Derive ratio of correct predictions.
+    return correct / len(val_loader.dataset), val_losses.append(val_loss) # Derive ratio of correct predictions.
 
 
 start = time.time()
 best_val_acc = 0.9
-train_accs, val_accs = [], []
+train_accs = []
+val_accs = []
+train_losses = []
+val_losses = []
 for epoch in range(1, args.epochs):
     train()
-    train_acc = test(train_loader)
-    val_acc = test(val_loader)
+    train_acc, train_loss = test(train_loader)
+    val_acc, val_loss = test(val_loader)
     scheduler.step()
 
     if val_acc > best_val_acc:
@@ -209,18 +219,24 @@ for epoch in range(1, args.epochs):
         torch.save(model.state_dict(), save_weight_path)
 
     if epoch % 10 == 0:
-        print(f'Epoch numbers: {epoch:03d}, Train Acc: {train_acc:.4f}, Validation Acc: {val_acc:.4f}')
+        print(f'Epoch numbers: {epoch:03d}, Train Acc: {train_acc:.4f},  Validation Acc: {val_acc:.4f}')
     
     train_accs.append(train_acc)
     val_accs.append(val_acc)
+    train_losses.append(train_loss)
+    val_losses.append(val_loss)
+    
 # Visualization at the end of training
 fig, ax = plt.subplots()
 ax.plot(train_accs, c="steelblue", label="Training")
 ax.plot(val_accs, c="orangered", label="Validation")
+ax.plot(train_losses, c="black", label="Training Loss")
+ax.plot(val_losses, c="blue", label="Validation Loss")
+ax.plot()
 ax.grid()
 ax.legend()
 ax.set_xlabel('Epoch Numbers')
-ax.set_ylabel('Accuracy')
+ax.set_ylabel('Accuracy and Loss values')
 ax.legend(loc='best')
 ax.set_title("Accuracy evolution")
 #plt.show()
@@ -230,7 +246,6 @@ end = time.time()
 time_to_train = (end - start)/60
 print("Total training time to train on GPU (min):", time_to_train)
 print("****End training process here******")
-
 
 def inference(loader):
     model.eval()
