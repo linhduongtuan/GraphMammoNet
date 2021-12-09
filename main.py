@@ -172,9 +172,7 @@ def train():
         loss.backward()  # Derive gradients.
         optimizer.step()  # Update parameters based on gradients.
         optimizer.zero_grad()  # Clear gradients. 
-        running_loss += loss.item() #* data.num_graphs
-    train_loss = running_loss/len(train_loader)
-    train_losses.append(train_loss)
+
 
 #@timeit()
 def test(val_loader):
@@ -183,7 +181,7 @@ def test(val_loader):
     y_pred = []
     y_true = []
     running_loss = 0
-    for data in tqdm(val_loader, desc=(f'Training epoch: {epoch:04d}')):  # Iterate in batches over the training/test dataset.
+    for data in tqdm(val_loader, desc=(f'Validation epoch: {epoch:04d}')):  # Iterate in batches over the training/test dataset.
         data = data.to(device)
         out = model(data.x, data.edge_index, data.batch) 
         loss = criterion(out, data.y) 
@@ -220,6 +218,7 @@ for epoch in range(1, args.epochs):
 
     if epoch % 10 == 0:
         print(f'Epoch numbers: {epoch:03d}, Train Acc: {train_acc:.4f},  Validation Acc: {val_acc:.4f}')
+
     
     train_accs.append(train_acc)
     val_accs.append(val_acc)
