@@ -26,7 +26,7 @@ parser = argparse.ArgumentParser(description='PYG version of Mammography Classif
 # Setting Data path and dataset name
 parser.add_argument('--root', type=str, default='/home/linh/Downloads/data/', metavar='DIR',
                     help='path to dataset')
-parser.add_argument('--dataset_name', type=str, default='Prewitt_v2',
+parser.add_argument('--dataset_name', type=str, default='Type_Prewitt_v1',
                     help='Choose dataset to train')
 
 # Setting hardwares and random seeds
@@ -42,8 +42,10 @@ parser.add_argument('-b','--batch_size', type=int, default=2048, metavar='B',
                     help='input batch size for training (default: 2048')
 parser.add_argument('--step_size', type=int, default=20, metavar='SS',
                     help='Set step size for scheduler of learning rate (default: 20')
-parser.add_argument('--epochs', type=int, default=100, metavar='N',
+parser.add_argument('-e', '--epochs', type=int, default=100, metavar='N',
                     help='number of epochs to train (default: 100)')
+parser.add_argument('--lr', type=int, default=0.001, metavar='LR',
+                    help='Learning rate (default: 0.001')
 parser.add_argument('--decay-rate', '--dr', type=float, default=0.1, metavar='RATE',
                     help='LR decay rate (default: 0.1)')
 parser.add_argument('--momentum', type=float, default=0.9, metavar='M',
@@ -164,10 +166,13 @@ scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=args.step_size,
 #@profileit()
 def train():
     model.train()
+    correct = 0
     running_loss = 0
     for data in tqdm(train_loader, desc=(f'Training epoch: {epoch:04d}')):  # Iterate in batches over the training dataset.
         data = data.to(device)
-        out = model(data.x, data.edge_index, data.batch)  # Perform a single forward pass.
+        out = model(data.x, data.edge_index, data.batch)
+        pred = out.argmax(dim=1)  # Use the class with highest probability.
+        correct += int((pred == data.y).sum())  # Perform a single forward pass.
         loss = criterion(out, data.y)  # Compute the loss.
         loss.backward()  # Derive gradients.
         optimizer.step()  # Update parameters based on gradients.
@@ -175,6 +180,7 @@ def train():
 
 
 #@timeit()
+@torch.no_grad()
 def test(val_loader):
     model.eval()
     correct = 0
@@ -192,7 +198,6 @@ def test(val_loader):
         y_pred.extend(np.squeeze(pred.cpu().numpy().T))
         running_loss += loss.item() #* data.num_graphs
     val_loss = running_loss/len(val_loader)
-    
     report = classification_report(y_true, y_pred, digits=4)
     print(report)   
     return correct / len(val_loader.dataset), val_loss # Derive ratio of correct predictions.
@@ -225,6 +230,7 @@ for epoch in range(1, args.epochs):
     train_losses.append(train_loss)
     val_losses.append(val_loss)
     
+    
 # Visualization at the end of training
 fig, ax = plt.subplots()
 ax.plot(train_accs, c="steelblue", label="Training")
@@ -246,6 +252,7 @@ time_to_train = (end - start)/60
 print("Total training time to train on GPU (min):", time_to_train)
 print("****End training process here******")
 
+@torch.no_grad()
 def inference(loader):
     model.eval()
     correct = 0
