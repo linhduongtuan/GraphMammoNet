@@ -38,5 +38,5 @@ abstract = {Mammograms are breast X-ray images and they are used by doctors, amo
 ```
 ### Latest DOI
 
-[![DOI](https://doi.org/10.1016/j.asoc.2022.109974.svg)](https://doi.org/10.1016/j.asoc.2022.109974)
+[![DOI](https://doi.org/10.1016/j.asoc.2022.109974)](https://doi.org/10.1016/j.asoc.2022.109974)
 
