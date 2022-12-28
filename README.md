@@ -1,5 +1,5 @@
-# GraphMammoNet
-Mammograms image detection using GraphMammoNet (MammoGNN),  GAT, GCN, and GraphConv based architectures. The code has been performed on both classification tasks of 4-class for Breast density types and 8-class for BIRAD scores.
+# MammoGNN
+Mammograms have been curated and labeled by three experienced radiologists working at Hanoi Oncology Hospital, Hanoi, Vietnam during 2020 - 2021. Afterwads, the original data are resized and converted into an approriate format. Such images then are detected edges using Prewitt filter. Later, every edge mammogram is transformed as a relevant graph representing to its links and nodes. Finally, we construct our proposed MammoGNN using  GAT, GCN, and GraphConv based layer architectures. The code has been performed on both classification tasks of 4-class for Breast density types and 8-class for BIRAD scores.
 
 # Dataset link
 ```
