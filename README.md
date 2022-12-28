@@ -23,7 +23,7 @@ Please contact us to access both the original and preprocessing (edge detection 
 
 # Citation
 We have published our work entitled as "Edge detection and graph neural networks to classify mammograms: A case study with a dataset from Vietnamese patients" under the "Applied Soft Computing Journal". If this repository helps you in your research in any way, please cite our paper:
-```
+```bibtex
 @article{DUONG2022109974,
 title = {Edge detection and graph neural networks to classify mammograms: A case study with a dataset from Vietnamese patients},
 journal = {Applied Soft Computing},
@@ -36,3 +36,7 @@ author = {Linh T. Duong and Cong Q. Chu and Phuong T. Nguyen and Son T. Nguyen a
 abstract = {Mammograms are breast X-ray images and they are used by doctors, among other purposes, as an effective means of detecting breast cancer. Screening mammography is crucial since it allows doctors to understand better the situation and have suitable intervention. The classification of medical modalities is a prerequisite for development of computer-aided diagnosis tools in healthcare, and various techniques have been proposed to automatically classify from mammography images. Though there have been several tools developed, they have been mostly validated with data collected from Western women. Based on our initial investigations, breast anatomy in Vietnamese women differs from that of Western women, due to denser breast tissue. In this paper, we propose MammoGNN – a practical solution to the classification of mammograms using the synergy between image processing techniques and graph neural networks. First, a well-founded edge detection algorithm was applied to provide input for the recommendation engine. Afterward, we empirically experimented to select suitable graph neural networks to manage the training and prediction. A mammogram dataset was curated from 2,351 Vietnamese women to validate the conceived tool. By several testing instances, MammoGNN obtains a maximum accuracy of 100%, precision and recall of 1.0 on independent and shuffle test sets for both classification of BI-RADS scores and breast density types. The experimental results also demonstrate that our proposed approach obtains an optimal prediction performance on the considered datasets, outperforming different baselines. We anticipate that the proposed approach can be deployed as a non-invasive pre-screening tool to assist doctors in performing their diagnosis activities.}
 }
 ```
+### Latest DOI
+
+[![DOI](https://zenodo.org/badge/168799526.svg)](https://zenodo.org/badge/latestdoi/168799526)
+
